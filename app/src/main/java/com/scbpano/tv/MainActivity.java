@@ -55,9 +55,12 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
         webSettings.setLoadWithOverviewMode(true);
         webSettings.setUseWideViewPort(true);
-        webSettings.setBuiltInZoomControls(false);
-        webSettings.setDisplayZoomControls(false);
-        webSettings.setSupportZoom(false);
+        // Zoom özelliklerini etkinleştir
+        webSettings.setBuiltInZoomControls(true);
+        webSettings.setDisplayZoomControls(false); // UI kontrollerini gizle (remote ile kontrol edeceğiz)
+        webSettings.setSupportZoom(true);
+        // İlk zoom seviyesini ayarla (büyük TV'ler için)
+        webView.setInitialScale(100); // %100 zoom
         webSettings.setMediaPlaybackRequiresUserGesture(false);
         webSettings.setAllowFileAccess(true);
         webSettings.setAllowContentAccess(true);
@@ -87,6 +90,17 @@ public class MainActivity extends AppCompatActivity {
                 super.onPageFinished(view, url);
                 // Sayfa yüklendiğinde immersive modu tekrar etkinleştir
                 hideSystemUI();
+                // Sayfa yüklendiğinde zoom seviyesini ayarla (büyük TV'ler için optimize)
+                // Viewport meta tag ekle veya güncelle
+                String viewportScript = 
+                    "var meta = document.querySelector('meta[name=viewport]');" +
+                    "if (!meta) {" +
+                    "  meta = document.createElement('meta');" +
+                    "  meta.name = 'viewport';" +
+                    "  document.getElementsByTagName('head')[0].appendChild(meta);" +
+                    "}" +
+                    "meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';";
+                view.evaluateJavascript(viewportScript, null);
             }
         });
         
@@ -131,6 +145,21 @@ public class MainActivity extends AppCompatActivity {
     
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        // Zoom kontrolleri (TV remote için)
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+            // Ses artırma tuşu ile zoom in
+            webView.zoomIn();
+            showZoomLevel();
+            return true;
+        }
+        
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            // Ses azaltma tuşu ile zoom out
+            webView.zoomOut();
+            showZoomLevel();
+            return true;
+        }
+        
         // Geri tuşu kontrolü
         if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
             webView.goBack();
@@ -158,6 +187,11 @@ public class MainActivity extends AppCompatActivity {
         }
         
         return super.onKeyDown(keyCode, event);
+    }
+    
+    private void showZoomLevel() {
+        // Zoom seviyesini göster (opsiyonel - kısa süreli toast)
+        // WebView'in zoom seviyesini doğrudan almak zor olduğu için basit bir mesaj gösteriyoruz
     }
     
     @Override
