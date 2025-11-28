@@ -93,70 +93,111 @@ public class MainActivity extends AppCompatActivity {
                 // Sayfa yüklendiğinde immersive modu tekrar etkinleştir
                 hideSystemUI();
                 
-                // Sayfa yüklendiğinde 16:9 oranında görüntüle (55 inç TV için optimize)
-                // CSS ile sayfanın genişliğini ve yüksekliğini 16:9 oranında ayarla
+                // Sayfa yüklendiğinde 16:10 oranında görüntüle ve çözünürlüğü büyüt
+                // CSS ile sayfanın genişliğini ve yüksekliğini 16:10 oranında ayarla
                 String scaleValue = String.format("%.2f", DISPLAY_SCALE);
                 
                 String resolutionScript = 
                     "(function() {" +
-                    "  // Mevcut style'ı kaldır" +
-                    "  var oldStyle = document.getElementById('tv-resolution-style');" +
-                    "  if (oldStyle) oldStyle.remove();" +
-                    "  " +
-                    "  // TV ekran boyutunu al (varsayılan 1920x1080 Full HD)" +
-                    "  var screenWidth = window.innerWidth || 1920;" +
-                    "  var screenHeight = window.innerHeight || 1080;" +
-                    "  " +
-                    "  // 16:9 oranını hesapla" +
-                    "  var targetWidth = screenWidth * " + scaleValue + ";" +
-                    "  var targetHeight = targetWidth * (9 / 16); // 16:9 oranı" +
-                    "  " +
-                    "  // Scale hesapla (ekrana sığdırmak için)" +
-                    "  var scaleX = screenWidth / targetWidth;" +
-                    "  var scaleY = screenHeight / targetHeight;" +
-                    "  var finalScale = Math.min(scaleX, scaleY) * " + scaleValue + ";" +
-                    "  " +
-                    "  // Yeni style oluştur" +
-                    "  var style = document.createElement('style');" +
-                    "  style.id = 'tv-resolution-style';" +
-                    "  style.innerHTML = 'html, body { " +
-                    "    transform: scale(' + finalScale + '); " +
-                    "    transform-origin: top left; " +
-                    "    width: ' + targetWidth + 'px; " +
-                    "    height: ' + targetHeight + 'px; " +
-                    "    margin: 0; " +
-                    "    padding: 0; " +
-                    "    overflow: hidden; " +
-                    "    aspect-ratio: 16 / 9; " +
-                    "  }';" +
-                    "  document.head.appendChild(style);" +
-                    "  " +
-                    "  // Body'ye de uygula" +
-                    "  if (document.body) {" +
-                    "    document.body.style.transform = 'scale(' + finalScale + ')';" +
-                    "    document.body.style.transformOrigin = 'top left';" +
-                    "    document.body.style.width = targetWidth + 'px';" +
-                    "    document.body.style.height = targetHeight + 'px';" +
-                    "    document.body.style.aspectRatio = '16 / 9';" +
+                    "  function applyResolution() {" +
+                    "    // Mevcut style'ı kaldır" +
+                    "    var oldStyle = document.getElementById('tv-resolution-style');" +
+                    "    if (oldStyle) oldStyle.remove();" +
+                    "    " +
+                    "    // TV ekran boyutunu al" +
+                    "    var screenWidth = window.innerWidth || 1920;" +
+                    "    var screenHeight = window.innerHeight || 1080;" +
+                    "    " +
+                    "    // 16:10 oranını hesapla (daha geniş görüntü)" +
+                    "    var aspectRatio = 16 / 10; // 1.6" +
+                    "    var targetWidth = screenWidth * " + scaleValue + ";" +
+                    "    var targetHeight = targetWidth / aspectRatio; // 16:10 oranı" +
+                    "    " +
+                    "    // Scale hesapla (ekrana sığdırmak için)" +
+                    "    var scaleX = screenWidth / targetWidth;" +
+                    "    var scaleY = screenHeight / targetHeight;" +
+                    "    var finalScale = Math.min(scaleX, scaleY) * " + scaleValue + ";" +
+                    "    " +
+                    "    // Yeni style oluştur - !important ile zorla uygula" +
+                    "    var style = document.createElement('style');" +
+                    "    style.id = 'tv-resolution-style';" +
+                    "    style.innerHTML = 'html { " +
+                    "      width: ' + targetWidth + 'px !important; " +
+                    "      height: ' + targetHeight + 'px !important; " +
+                    "      transform: scale(' + finalScale + ') !important; " +
+                    "      transform-origin: top left !important; " +
+                    "      margin: 0 !important; " +
+                    "      padding: 0 !important; " +
+                    "      overflow: hidden !important; " +
+                    "      aspect-ratio: 16 / 10 !important; " +
+                    "    } " +
+                    "    body { " +
+                    "      width: ' + targetWidth + 'px !important; " +
+                    "      height: ' + targetHeight + 'px !important; " +
+                    "      transform: scale(' + finalScale + ') !important; " +
+                    "      transform-origin: top left !important; " +
+                    "      margin: 0 !important; " +
+                    "      padding: 0 !important; " +
+                    "      overflow: hidden !important; " +
+                    "      aspect-ratio: 16 / 10 !important; " +
+                    "      box-sizing: border-box !important; " +
+                    "    }';" +
+                    "    document.head.appendChild(style);" +
+                    "    " +
+                    "    // HTML elementine zorla uygula" +
+                    "    if (document.documentElement) {" +
+                    "      document.documentElement.style.setProperty('width', targetWidth + 'px', 'important');" +
+                    "      document.documentElement.style.setProperty('height', targetHeight + 'px', 'important');" +
+                    "      document.documentElement.style.setProperty('transform', 'scale(' + finalScale + ')', 'important');" +
+                    "      document.documentElement.style.setProperty('transform-origin', 'top left', 'important');" +
+                    "      document.documentElement.style.setProperty('aspect-ratio', '16 / 10', 'important');" +
+                    "    }" +
+                    "    " +
+                    "    // Body'ye zorla uygula" +
+                    "    if (document.body) {" +
+                    "      document.body.style.setProperty('width', targetWidth + 'px', 'important');" +
+                    "      document.body.style.setProperty('height', targetHeight + 'px', 'important');" +
+                    "      document.body.style.setProperty('transform', 'scale(' + finalScale + ')', 'important');" +
+                    "      document.body.style.setProperty('transform-origin', 'top left', 'important');" +
+                    "      document.body.style.setProperty('aspect-ratio', '16 / 10', 'important');" +
+                    "      document.body.style.setProperty('margin', '0', 'important');" +
+                    "      document.body.style.setProperty('padding', '0', 'important');" +
+                    "    }" +
                     "  }" +
                     "  " +
-                    "  // HTML elementine de uygula" +
-                    "  if (document.documentElement) {" +
-                    "    document.documentElement.style.width = targetWidth + 'px';" +
-                    "    document.documentElement.style.height = targetHeight + 'px';" +
-                    "    document.documentElement.style.aspectRatio = '16 / 9';" +
+                    "  // Hemen uygula" +
+                    "  applyResolution();" +
+                    "  " +
+                    "  // Sayfa tam yüklendikten sonra tekrar uygula" +
+                    "  if (document.readyState === 'complete') {" +
+                    "    setTimeout(applyResolution, 100);" +
+                    "    setTimeout(applyResolution, 500);" +
+                    "    setTimeout(applyResolution, 1000);" +
+                    "  } else {" +
+                    "    window.addEventListener('load', function() {" +
+                    "      setTimeout(applyResolution, 100);" +
+                    "      setTimeout(applyResolution, 500);" +
+                    "      setTimeout(applyResolution, 1000);" +
+                    "    });" +
                     "  }" +
                     "})();";
                 
-                // Önce sayfanın tam yüklenmesini bekle
+                // Önce sayfanın tam yüklenmesini bekle ve birkaç kez dene
                 view.postDelayed(new Runnable() {
                     @Override
                     public void run() {
                         view.evaluateJavascript(resolutionScript, null);
                     }
-                }, 500);
+                }, 300);
                 
-                // Viewport meta tag ekle veya güncelle (16:9 oranı için)
+                view.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        view.evaluateJavascript(resolutionScript, null);
+                    }
+                }, 1000);
+                
+                // Viewport meta tag ekle veya güncelle (16:10 oranı için)
                 String viewportScript = 
                     "var meta = document.querySelector('meta[name=viewport]');" +
                     "if (!meta) {" +
