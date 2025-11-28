@@ -28,13 +28,38 @@ jobs:
       run: chmod +x gradlew
       
     - name: Build APK
-      run: ./gradlew assembleRelease
+      run: ./gradlew assembleRelease --stacktrace
       
     - name: Check APK location
       run: |
-        echo "Checking for APK files..."
-        find app/build/outputs -name "*.apk" -type f || echo "No APK files found"
-        ls -la app/build/outputs/apk/release/ || echo "Release directory not found"
+        echo "=== Checking for APK files ==="
+        echo "Searching in app/build/outputs..."
+        find app/build/outputs -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
+        echo ""
+        echo "=== Checking release directory ==="
+        if [ -d "app/build/outputs/apk/release" ]; then
+          echo "Release directory exists:"
+          ls -la app/build/outputs/apk/release/
+        else
+          echo "Release directory does not exist"
+        fi
+        echo ""
+        echo "=== Checking all build outputs ==="
+        find app/build/outputs -type f -name "*.apk" 2>/dev/null | head -20 || echo "No APK files found anywhere"
+        echo ""
+        echo "=== Build directory structure ==="
+        ls -la app/build/ 2>/dev/null || echo "Build directory does not exist"
+      
+    - name: Verify APK exists
+      run: |
+        if [ ! -f "app/build/outputs/apk/release/app-release.apk" ]; then
+          echo "ERROR: APK file not found at expected location!"
+          echo "Build may have failed silently or APK was not generated."
+          exit 1
+        else
+          echo "✓ APK file found successfully"
+          ls -lh app/build/outputs/apk/release/app-release.apk
+        fi
       
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
