@@ -30,12 +30,19 @@ jobs:
     - name: Build APK
       run: ./gradlew assembleRelease
       
+    - name: Check APK location
+      run: |
+        echo "Checking for APK files..."
+        find app/build/outputs -name "*.apk" -type f || echo "No APK files found"
+        ls -la app/build/outputs/apk/release/ || echo "Release directory not found"
+      
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
         name: app-release-apk
         path: app/build/outputs/apk/release/app-release.apk
         retention-days: 30
+        if-no-files-found: warn
         
     - name: Upload APK to Release (optional)
       if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
