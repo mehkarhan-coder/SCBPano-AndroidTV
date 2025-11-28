@@ -7,7 +7,7 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.NoActionBar"
@@ -35,7 +35,7 @@
         <!-- Android TV Banner -->
         <activity
             android:name="androidx.tvprovider.media.tv.TvContractCompat.PreviewPrograms"
-            android:banner="@mipmap/ic_launcher"
+            android:banner="@drawable/ic_launcher"
             tools:ignore="Instantiatable" />
             
     </application>
