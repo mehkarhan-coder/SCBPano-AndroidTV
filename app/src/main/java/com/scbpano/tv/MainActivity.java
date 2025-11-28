@@ -24,7 +24,8 @@ public class MainActivity extends AppCompatActivity {
     private static final String WEB_URL = "https://samsunkml.com";
     private Handler handler = new Handler();
     private boolean doubleBackToExitPressedOnce = false;
-    private float currentZoom = 0.75f; // Başlangıç zoom seviyesi (%75)
+    // 55 inç TV için görünen çözünürlük ayarı (0.7 = %70, 0.8 = %80, 0.75 = %75)
+    private static final float DISPLAY_SCALE = 0.70f; // %70 scale (daha küçük görüntü)
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -57,11 +58,11 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setLoadWithOverviewMode(true);
         webSettings.setUseWideViewPort(true);
         // Zoom özelliklerini etkinleştir
-        webSettings.setBuiltInZoomControls(true);
-        webSettings.setDisplayZoomControls(false); // UI kontrollerini gizle (remote ile kontrol edeceğiz)
-        webSettings.setSupportZoom(true);
-        // İlk zoom seviyesini ayarla (55 inç TV için daha küçük görüntü - %75)
-        webView.setInitialScale(75); // %75 zoom (daha küçük görüntü)
+        webSettings.setBuiltInZoomControls(false);
+        webSettings.setDisplayZoomControls(false);
+        webSettings.setSupportZoom(false); // CSS ile zoom yapacağız
+        // İlk zoom seviyesini ayarla (CSS ile override edilecek)
+        webView.setInitialScale((int)(DISPLAY_SCALE * 100));
         webSettings.setMediaPlaybackRequiresUserGesture(false);
         webSettings.setAllowFileAccess(true);
         webSettings.setAllowContentAccess(true);
@@ -91,15 +92,50 @@ public class MainActivity extends AppCompatActivity {
                 super.onPageFinished(view, url);
                 // Sayfa yüklendiğinde immersive modu tekrar etkinleştir
                 hideSystemUI();
-                // Sayfa yüklendiğinde otomatik olarak küçült (55 inç TV için optimize)
-                // CSS transform ile sayfayı %75'e küçült
-                String zoomScript = 
+                
+                // Sayfa yüklendiğinde görünen çözünürlüğü ayarla (55 inç TV için optimize)
+                // CSS ile sayfanın genişliğini ve scale'ini ayarla
+                String scaleValue = String.format("%.2f", DISPLAY_SCALE);
+                String widthPercent = String.format("%.2f", 100.0 / DISPLAY_SCALE);
+                
+                String resolutionScript = 
                     "(function() {" +
+                    "  // Mevcut style'ı kaldır" +
+                    "  var oldStyle = document.getElementById('tv-resolution-style');" +
+                    "  if (oldStyle) oldStyle.remove();" +
+                    "  " +
+                    "  // Yeni style oluştur" +
                     "  var style = document.createElement('style');" +
-                    "  style.innerHTML = 'body { transform: scale(0.75); transform-origin: top left; width: 133.33%; height: 133.33%; }';" +
+                    "  style.id = 'tv-resolution-style';" +
+                    "  var scale = " + scaleValue + ";" +
+                    "  var widthPercent = " + widthPercent + ";" +
+                    "  style.innerHTML = 'html, body { " +
+                    "    transform: scale(' + scale + '); " +
+                    "    transform-origin: top left; " +
+                    "    width: ' + widthPercent + '%; " +
+                    "    height: ' + widthPercent + '%; " +
+                    "    margin: 0; " +
+                    "    padding: 0; " +
+                    "    overflow: hidden; " +
+                    "  }';" +
                     "  document.head.appendChild(style);" +
+                    "  " +
+                    "  // Body'ye de uygula" +
+                    "  if (document.body) {" +
+                    "    document.body.style.transform = 'scale(' + scale + ')';" +
+                    "    document.body.style.transformOrigin = 'top left';" +
+                    "    document.body.style.width = widthPercent + '%';" +
+                    "    document.body.style.height = widthPercent + '%';" +
+                    "  }" +
                     "})();";
-                view.evaluateJavascript(zoomScript, null);
+                
+                // Önce sayfanın tam yüklenmesini bekle
+                view.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        view.evaluateJavascript(resolutionScript, null);
+                    }
+                }, 500);
                 
                 // Viewport meta tag ekle veya güncelle
                 String viewportScript = 
@@ -109,7 +145,7 @@ public class MainActivity extends AppCompatActivity {
                     "  meta.name = 'viewport';" +
                     "  document.getElementsByTagName('head')[0].appendChild(meta);" +
                     "}" +
-                    "meta.content = 'width=1333px, initial-scale=0.75, maximum-scale=2.0, user-scalable=yes';";
+                    "meta.content = 'width=1920px, initial-scale=" + scaleValue + ", maximum-scale=2.0, user-scalable=no';";
                 view.evaluateJavascript(viewportScript, null);
             }
         });
@@ -155,10 +191,6 @@ public class MainActivity extends AppCompatActivity {
     
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        // Zoom kontrolleri (TV remote için - OK tuşu + yukarı/aşağı)
-        // OK tuşu (DPAD_CENTER) + Yukarı tuşu = Zoom In
-        // OK tuşu (DPAD_CENTER) + Aşağı tuşu = Zoom Out
-        
         // Geri tuşu kontrolü
         if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
             webView.goBack();
@@ -185,41 +217,7 @@ public class MainActivity extends AppCompatActivity {
             return true;
         }
         
-        // Yön tuşları ile zoom kontrolü (OK tuşu basılı değilse normal navigasyon)
-        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-            // Yukarı tuşu - Zoom In (yakınlaştır)
-            currentZoom = Math.min(currentZoom + 0.05f, 1.5f); // Maksimum %150
-            applyZoom();
-            return true;
-        }
-        
-        if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-            // Aşağı tuşu - Zoom Out (uzaklaştır)
-            currentZoom = Math.max(currentZoom - 0.05f, 0.5f); // Minimum %50
-            applyZoom();
-            return true;
-        }
-        
         return super.onKeyDown(keyCode, event);
-    }
-    
-    private void applyZoom() {
-        // CSS transform ile zoom uygula
-        String zoomScript = String.format(
-            "(function() {" +
-            "  var style = document.getElementById('tv-zoom-style');" +
-            "  if (!style) {" +
-            "    style = document.createElement('style');" +
-            "    style.id = 'tv-zoom-style';" +
-            "    document.head.appendChild(style);" +
-            "  }" +
-            "  var scale = %.2f;" +
-            "  style.innerHTML = 'body { transform: scale(' + scale + '); transform-origin: top left; width: ' + (100/scale) + '%%; height: ' + (100/scale) + '%%; }';" +
-            "})();",
-            currentZoom
-        );
-        webView.evaluateJavascript(zoomScript, null);
-        Toast.makeText(this, String.format("Zoom: %.0f%%", currentZoom * 100), Toast.LENGTH_SHORT).show();
     }
     
     @Override
