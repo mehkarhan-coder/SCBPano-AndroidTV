@@ -24,6 +24,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String WEB_URL = "https://samsunkml.com";
     private Handler handler = new Handler();
     private boolean doubleBackToExitPressedOnce = false;
+    private float currentZoom = 0.75f; // Başlangıç zoom seviyesi (%75)
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -59,8 +60,8 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setBuiltInZoomControls(true);
         webSettings.setDisplayZoomControls(false); // UI kontrollerini gizle (remote ile kontrol edeceğiz)
         webSettings.setSupportZoom(true);
-        // İlk zoom seviyesini ayarla (büyük TV'ler için)
-        webView.setInitialScale(100); // %100 zoom
+        // İlk zoom seviyesini ayarla (55 inç TV için daha küçük görüntü - %75)
+        webView.setInitialScale(75); // %75 zoom (daha küçük görüntü)
         webSettings.setMediaPlaybackRequiresUserGesture(false);
         webSettings.setAllowFileAccess(true);
         webSettings.setAllowContentAccess(true);
@@ -90,7 +91,16 @@ public class MainActivity extends AppCompatActivity {
                 super.onPageFinished(view, url);
                 // Sayfa yüklendiğinde immersive modu tekrar etkinleştir
                 hideSystemUI();
-                // Sayfa yüklendiğinde zoom seviyesini ayarla (büyük TV'ler için optimize)
+                // Sayfa yüklendiğinde otomatik olarak küçült (55 inç TV için optimize)
+                // CSS transform ile sayfayı %75'e küçült
+                String zoomScript = 
+                    "(function() {" +
+                    "  var style = document.createElement('style');" +
+                    "  style.innerHTML = 'body { transform: scale(0.75); transform-origin: top left; width: 133.33%; height: 133.33%; }';" +
+                    "  document.head.appendChild(style);" +
+                    "})();";
+                view.evaluateJavascript(zoomScript, null);
+                
                 // Viewport meta tag ekle veya güncelle
                 String viewportScript = 
                     "var meta = document.querySelector('meta[name=viewport]');" +
@@ -99,7 +109,7 @@ public class MainActivity extends AppCompatActivity {
                     "  meta.name = 'viewport';" +
                     "  document.getElementsByTagName('head')[0].appendChild(meta);" +
                     "}" +
-                    "meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';";
+                    "meta.content = 'width=1333px, initial-scale=0.75, maximum-scale=2.0, user-scalable=yes';";
                 view.evaluateJavascript(viewportScript, null);
             }
         });
@@ -145,20 +155,9 @@ public class MainActivity extends AppCompatActivity {
     
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        // Zoom kontrolleri (TV remote için)
-        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
-            // Ses artırma tuşu ile zoom in
-            webView.zoomIn();
-            showZoomLevel();
-            return true;
-        }
-        
-        if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
-            // Ses azaltma tuşu ile zoom out
-            webView.zoomOut();
-            showZoomLevel();
-            return true;
-        }
+        // Zoom kontrolleri (TV remote için - OK tuşu + yukarı/aşağı)
+        // OK tuşu (DPAD_CENTER) + Yukarı tuşu = Zoom In
+        // OK tuşu (DPAD_CENTER) + Aşağı tuşu = Zoom Out
         
         // Geri tuşu kontrolü
         if (keyCode == KeyEvent.KEYCODE_BACK && webView.canGoBack()) {
@@ -186,12 +185,41 @@ public class MainActivity extends AppCompatActivity {
             return true;
         }
         
+        // Yön tuşları ile zoom kontrolü (OK tuşu basılı değilse normal navigasyon)
+        if (keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+            // Yukarı tuşu - Zoom In (yakınlaştır)
+            currentZoom = Math.min(currentZoom + 0.05f, 1.5f); // Maksimum %150
+            applyZoom();
+            return true;
+        }
+        
+        if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+            // Aşağı tuşu - Zoom Out (uzaklaştır)
+            currentZoom = Math.max(currentZoom - 0.05f, 0.5f); // Minimum %50
+            applyZoom();
+            return true;
+        }
+        
         return super.onKeyDown(keyCode, event);
     }
     
-    private void showZoomLevel() {
-        // Zoom seviyesini göster (opsiyonel - kısa süreli toast)
-        // WebView'in zoom seviyesini doğrudan almak zor olduğu için basit bir mesaj gösteriyoruz
+    private void applyZoom() {
+        // CSS transform ile zoom uygula
+        String zoomScript = String.format(
+            "(function() {" +
+            "  var style = document.getElementById('tv-zoom-style');" +
+            "  if (!style) {" +
+            "    style = document.createElement('style');" +
+            "    style.id = 'tv-zoom-style';" +
+            "    document.head.appendChild(style);" +
+            "  }" +
+            "  var scale = %.2f;" +
+            "  style.innerHTML = 'body { transform: scale(' + scale + '); transform-origin: top left; width: ' + (100/scale) + '%%; height: ' + (100/scale) + '%%; }';" +
+            "})();",
+            currentZoom
+        );
+        webView.evaluateJavascript(zoomScript, null);
+        Toast.makeText(this, String.format("Zoom: %.0f%%", currentZoom * 100), Toast.LENGTH_SHORT).show();
     }
     
     @Override
