@@ -24,6 +24,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String WEB_URL = "https://samsunkml.com";
     private Handler handler = new Handler();
     private boolean doubleBackToExitPressedOnce = false;
+    private String lastLoadedDate = ""; // Son yüklenen tarih
     // 55 inç TV için görünen çözünürlük ayarı (0.7 = %70, 0.8 = %80, 0.75 = %75)
     private static final float DISPLAY_SCALE = 0.70f; // %70 scale (daha küçük görüntü)
 
@@ -54,7 +55,9 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setDomStorageEnabled(true);
         webSettings.setDatabaseEnabled(true);
         // setAppCacheEnabled removed in API 33 - cache is now managed automatically
-        webSettings.setCacheMode(WebSettings.LOAD_DEFAULT);
+        // Cache'i optimize et: Network öncelikli, eski cache'i kullanma
+        webSettings.setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK);
+        // Sayfa her yüklendiğinde güncel içeriği almak için
         webSettings.setLoadWithOverviewMode(true);
         webSettings.setUseWideViewPort(true);
         // Zoom özelliklerini etkinleştir
@@ -92,6 +95,9 @@ public class MainActivity extends AppCompatActivity {
                 super.onPageFinished(view, url);
                 // Sayfa yüklendiğinde immersive modu tekrar etkinleştir
                 hideSystemUI();
+                
+                // Tarih değişikliğini kontrol et ve gerekirse yenile
+                checkAndRefreshIfDateChanged(view);
                 
                 // Sayfa yüklendiğinde 16:10 oranında görüntüle ve çözünürlüğü büyüt
                 // CSS ile sayfanın genişliğini ve yüksekliğini 16:10 oranında ayarla
@@ -296,7 +302,47 @@ public class MainActivity extends AppCompatActivity {
         hideSystemUI();
         if (webView != null) {
             webView.onResume();
+            // Uygulama her açıldığında sayfayı yenile (güncel içerik için)
+            refreshPageIfNeeded();
         }
+    }
+    
+    private void refreshPageIfNeeded() {
+        // Uygulama her açıldığında sayfayı yenile
+        // Cache'i bypass etmek için timestamp ekle
+        if (webView != null && isNetworkAvailable()) {
+            String urlWithTimestamp = WEB_URL + "?t=" + System.currentTimeMillis();
+            webView.loadUrl(urlWithTimestamp);
+        }
+    }
+    
+    private void checkAndRefreshIfDateChanged(WebView view) {
+        // JavaScript ile sayfadaki tarihi kontrol et
+        String dateCheckScript = 
+            "(function() {" +
+            "  var currentDate = new Date().toLocaleDateString('tr-TR');" +
+            "  return currentDate;" +
+            "})();";
+        
+        view.evaluateJavascript(dateCheckScript, new android.webkit.ValueCallback<String>() {
+            @Override
+            public void onReceiveValue(String value) {
+                // JavaScript'ten gelen tarih string'i (tırnak işaretleri ile)
+                String currentDate = value != null ? value.replace("\"", "") : "";
+                
+                // Tarih değiştiyse sayfayı yenile
+                if (!lastLoadedDate.isEmpty() && !lastLoadedDate.equals(currentDate)) {
+                    if (webView != null && isNetworkAvailable()) {
+                        // Cache'i bypass et
+                        String urlWithTimestamp = WEB_URL + "?refresh=" + System.currentTimeMillis();
+                        webView.loadUrl(urlWithTimestamp);
+                    }
+                }
+                
+                // Son yüklenen tarihi güncelle
+                lastLoadedDate = currentDate;
+            }
+        });
     }
     
     @Override
